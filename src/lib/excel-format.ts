@@ -28,8 +28,12 @@ export function parseIzinDefteri(buffer: ArrayBuffer): IzinDefteriRow[] {
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-  const headerRow = rows.findIndex(r => String(r[0] || '').trim() === 'SICIL NO')
-  if (headerRow === -1) throw new Error('SICIL NO sütunu bulunamadı')
+  const normalize = (s: string) => s.toUpperCase().replace(/İ/g, 'I').replace(/[^A-Z0-9]/g, '')
+  let headerRow = rows.findIndex(r => normalize(String(r[0] || '')).includes('SICIL'))
+  if (headerRow === -1) {
+    headerRow = rows.findIndex((r, i) => i < 10 && String(r[0] || '').replace(/\s/g, '').length > 0 && String(r[1] || '').includes('ADI'))
+    if (headerRow === -1) throw new Error('SICIL NO sütunu bulunamadı')
+  }
 
   const dataRows = rows.slice(headerRow + 1).filter((r: any[]) => r[0] && String(r[0]).trim() !== '')
 
@@ -80,8 +84,8 @@ export function parseIzinliRaporluListe(buffer: ArrayBuffer) {
 
   for (const row of rows) {
     const h = String(row[0] || '').trim()
-    if (h.includes('RAPORLU PERSONELLER')) { inReports = true; inLeaves = false; continue }
-    if (h.includes('IZINLI VE IZNE CIKACAK')) { inLeaves = true; inReports = false; continue }
+    if (h.toUpperCase().replace(/İ/g, 'I').includes('RAPORLU')) { inReports = true; inLeaves = false; continue }
+    if (h.toUpperCase().replace(/İ/g, 'I').includes('IZINLI')) { inLeaves = true; inReports = false; continue }
 
     if (inReports && row[1] && String(row[1]).trim()) {
       reports.push({

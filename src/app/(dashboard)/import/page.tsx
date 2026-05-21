@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { parseIzinDefteri, parseIzinliRaporluListe, splitName, normalizeBranch, normalizeDepartment } from '@/lib/excel-format'
+import * as XLSX from 'xlsx'
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function ImportPage() {
@@ -14,17 +15,46 @@ export default function ImportPage() {
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<{ success: number; errors: string[] } | null>(null)
   const [fileType, setFileType] = useState<'defter' | 'liste' | ''>('')
+  const [debug, setDebug] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
+
+  const detectFormat = (buffer: ArrayBuffer): 'defter' | 'liste' | '' => {
+    try {
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+      const firstRow = rows[0] || []
+      const allText = rows.map((r: any[]) => String(r[0] || '')).join(' ').toUpperCase()
+
+      setDebug(prev => [...prev, `Sayfa: ${wb.SheetNames[0]}, Satır: ${rows.length}, İlk hücre: "${String(firstRow[0] || '').trim()}"`])
+
+      if (allText.includes('SICIL NO') && allText.includes('HAK ETTIGI')) return 'defter'
+      if (allText.includes('RAPORLU PERSONELLER') || allText.includes('IZINLI VE IZNE')) return 'liste'
+
+      return ''
+    } catch (e: any) {
+      setDebug(prev => [...prev, `Format algılama hatası: ${e.message}`])
+      return ''
+    }
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
     setFile(f)
     setResult(null)
-    if (f.name.includes('DEFTERI')) setFileType('defter')
-    else if (f.name.includes('LISTESI') || f.name.includes('RAPORLU')) setFileType('liste')
-    else setFileType('')
+    setDebug([])
+    setFileType('')
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const buffer = ev.target?.result as ArrayBuffer
+      const type = detectFormat(buffer)
+      setFileType(type)
+      if (!type) setDebug(prev => [...prev, '❌ Dosya formatı tanınamadı. İzin Defteri veya Personel Listesi dosyası olmalı.'])
+    }
+    reader.readAsArrayBuffer(f)
   }
 
   const handleImport = async () => {
@@ -39,6 +69,8 @@ export default function ImportPage() {
 
       if (fileType === 'defter') {
         const rows = parseIzinDefteri(buffer)
+        setDebug(prev => [...prev, `📋 ${rows.length} çalışan bulundu`])
+
         for (const row of rows) {
           try {
             const { first, last } = splitName(row.adi_soyadi)
@@ -75,6 +107,7 @@ export default function ImportPage() {
               empId = newEmp.id
             }
 
+            let importedLeaves = 0
             for (const izin of row.izinler) {
               if (!izin.baslangic || !izin.bitis) continue
               const startStr = normalizeDate(izin.baslangic)
@@ -90,7 +123,9 @@ export default function ImportPage() {
                 status: 'active',
                 notes: 'Excel\'den aktarıldı',
               }])
+              importedLeaves++
             }
+            setDebug(prev => [...prev, `✓ ${row.sicil_no} ${row.adi_soyadi} (${importedLeaves} izin kaydı)`])
             success++
           } catch (e: any) {
             errors.push(`${row.sicil_no} ${row.adi_soyadi}: ${e.message}`)
@@ -98,8 +133,9 @@ export default function ImportPage() {
         }
       } else if (fileType === 'liste') {
         const { leaves, reports } = parseIzinliRaporluListe(buffer)
+        setDebug(prev => [...prev, `📋 ${leaves.length} izin, ${reports.length} rapor kaydı bulundu`])
 
-        for (const item of [...leaves, ...reports.map(r => ({ ...r, remaining: 0 }))]) {
+        for (const item of leaves) {
           try {
             const { data: emp } = await supabase
               .from('employees')
@@ -111,14 +147,55 @@ export default function ImportPage() {
               errors.push(`${item.name}: Çalışan bulunamadı`)
               continue
             }
+
+            await supabase.from('leaves').insert([{
+              employee_id: emp.id,
+              start_date: normalizeDate(item.start),
+              end_date: normalizeDate(item.end),
+              total_days: item.remaining > 0 ? item.remaining : 1,
+              leave_type: item.reason?.toLowerCase().includes('yillik') ? 'annual' : 'annual',
+              status: 'active',
+              notes: `Excel listesinden - ${item.reason || ''}`,
+            }])
             success++
-          } catch { }
+          } catch (e: any) {
+            errors.push(`${item.name}: ${e.message}`)
+          }
+        }
+
+        for (const item of reports) {
+          try {
+            const { data: emp } = await supabase
+              .from('employees')
+              .select('id')
+              .ilike('first_name || \' \' || last_name', `%${item.name}%`)
+              .maybeSingle()
+
+            if (!emp) {
+              errors.push(`${item.name}: Çalışan bulunamadı`)
+              continue
+            }
+
+            await supabase.from('health_reports').insert([{
+              employee_id: emp.id,
+              start_date: normalizeDate(item.start),
+              end_date: normalizeDate(item.end),
+              total_days: 1,
+              diagnosis: item.reason || '',
+              status: 'active',
+              notes: `Excel listesinden`,
+            }])
+            success++
+          } catch (e: any) {
+            errors.push(`${item.name}: ${e.message}`)
+          }
         }
       }
 
       setResult({ success, errors })
     } catch (e: any) {
       setResult({ success: 0, errors: [e.message] })
+      setDebug(prev => [...prev, `❌ Hata: ${e.message}`])
     }
 
     setImporting(false)
@@ -177,6 +254,15 @@ export default function ImportPage() {
               )}
             </Button>
           )}
+
+          {debug.length > 0 && (
+            <div className="rounded-lg bg-slate-50 border p-3 max-h-48 overflow-y-auto">
+              <p className="text-xs font-medium text-muted-foreground mb-2">İşlem Detayı:</p>
+              {debug.map((d, i) => (
+                <p key={i} className="text-xs text-muted-foreground">{d}</p>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -213,7 +299,7 @@ export default function ImportPage() {
           <p className="font-medium text-foreground">1. IZIN DEFTERI 2026.xlsx</p>
           <p>Sicil No, Ad Soyad, Şube, Departman, İşe Giriş, izin bakiyeleri ve geçmiş izin kayıtlarını içerir.</p>
           <p className="font-medium text-foreground mt-3">2. IZINLI VE RAPORLU PERSONEL LISTESI.xlsx</p>
-          <p>Raporlu ve izinli personel listesini, tarihleri ve kalan izin bilgilerini içerir.</p>
+          <p>Raporlu ve izinli personel listesini içerir.</p>
         </CardContent>
       </Card>
     </div>
