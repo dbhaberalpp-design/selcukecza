@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-primary: #FF961F;
+  --color-primary-light: #FFB357;
+  --color-primary-dark: #E07D00;
+  --color-primary-50: #FFF4E5;
+  --color-primary-100: #FFE8CC;
+  --color-primary-200: #FFD199;
+  --color-primary-300: #FFBA66;
+  --color-primary-400: #FFA333;
+  --color-primary-600: #E07D00;
+  --color-primary-700: #B86400;
+  --color-primary-800: #8F4E00;
+  --color-primary-900: #663800;
+  --color-secondary: #2A4587;
+  --color-secondary-light: #3B5AA8;
+  --color-secondary-dark: #1E3366;
+  --color-secondary-50: #EAEEF6;
+  --color-secondary-100: #D4DCF0;
+  --color-secondary-200: #AAB9E0;
+  --color-secondary-300: #8096D0;
+  --color-secondary-700: #1E3366;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #FF961F;
+  --color-destructive: #ef4444;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+@layer base {
+  * { @apply border-border; }
+}
