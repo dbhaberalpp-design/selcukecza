@@ -25,12 +25,14 @@ export default function ImportPage() {
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
       const firstRow = rows[0] || []
-      const allText = rows.map((r: any[]) => String(r[0] || '')).join(' ').toUpperCase()
+      const normalize = (s: string) =>
+        s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/İ/g, 'I').replace(/ı/g, 'i').toUpperCase()
+      const allText = rows.map((r: any[]) => normalize(String(r[0] || ''))).join(' ')
 
       setDebug(prev => [...prev, `Sayfa: ${wb.SheetNames[0]}, Satır: ${rows.length}, İlk hücre: "${String(firstRow[0] || '').trim()}"`])
 
-      if (allText.includes('SICIL NO') && allText.includes('HAK ETTIGI')) return 'defter'
-      if (allText.includes('RAPORLU PERSONELLER') || allText.includes('IZINLI VE IZNE')) return 'liste'
+      if (allText.includes('SICIL') && allText.includes('HAK ETTIGI')) return 'defter'
+      if (allText.includes('RAPORLU') || allText.includes('IZINLI')) return 'liste'
 
       return ''
     } catch (e: any) {

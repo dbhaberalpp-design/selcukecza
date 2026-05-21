@@ -28,7 +28,14 @@ export function parseIzinDefteri(buffer: ArrayBuffer): IzinDefteriRow[] {
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-  const normalize = (s: string) => s.toUpperCase().replace(/İ/g, 'I').replace(/[^A-Z0-9]/g, '')
+  const normalize = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/İ/g, 'I')
+      .replace(/ı/g, 'i')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
   let headerRow = rows.findIndex(r => normalize(String(r[0] || '')).includes('SICIL'))
   if (headerRow === -1) {
     headerRow = rows.findIndex((r, i) => i < 10 && String(r[0] || '').replace(/\s/g, '').length > 0 && String(r[1] || '').includes('ADI'))
@@ -84,8 +91,9 @@ export function parseIzinliRaporluListe(buffer: ArrayBuffer) {
 
   for (const row of rows) {
     const h = String(row[0] || '').trim()
-    if (h.toUpperCase().replace(/İ/g, 'I').includes('RAPORLU')) { inReports = true; inLeaves = false; continue }
-    if (h.toUpperCase().replace(/İ/g, 'I').includes('IZINLI')) { inLeaves = true; inReports = false; continue }
+    const hNorm = h.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/İ/g, 'I').replace(/ı/g, 'i').toUpperCase()
+    if (hNorm.includes('RAPORLU')) { inReports = true; inLeaves = false; continue }
+    if (hNorm.includes('IZINLI')) { inLeaves = true; inReports = false; continue }
 
     if (inReports && row[1] && String(row[1]).trim()) {
       reports.push({
