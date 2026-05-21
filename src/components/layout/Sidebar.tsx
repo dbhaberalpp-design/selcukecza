@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   ClipboardList,
+  Upload,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/leaves', label: 'İzinler', icon: CalendarCheck },
   { href: '/reports', label: 'Raporlar', icon: Stethoscope },
   { href: '/leave-report', label: 'İzin Raporu', icon: FileText },
+  { href: '/import', label: 'Excel Aktar', icon: Upload },
   { href: '/admin', label: 'Yönetim', icon: Settings },
 ]
 

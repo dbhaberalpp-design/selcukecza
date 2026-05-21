@@ -8,6 +8,7 @@ const pageTitles: Record<string, string> = {
   '/leaves': 'İzin Yönetimi',
   '/reports': 'Rapor Yönetimi',
   '/leave-report': 'İzin Raporu',
+  '/import': 'Excel Aktar',
   '/admin': 'Yönetim Paneli',
 }
 

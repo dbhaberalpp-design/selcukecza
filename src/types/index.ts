@@ -14,6 +14,7 @@ export interface Employee {
   email: string;
   phone: string;
   start_date: string;
+  carryover_days?: number;
   created_at: string;
   updated_at: string;
 }

@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { FileText, FileSpreadsheet, Search } from 'lucide-react'
+import { FileText, FileSpreadsheet, Search, Download } from 'lucide-react'
 import { exportToExcel, exportToPDF } from '@/lib/export'
+import { exportIzinDefteri } from '@/lib/excel-format'
 
 export default function LeaveReportPage() {
   const [leaves, setLeaves] = useState<(Leave & { employee?: Employee })[]>([])
@@ -47,6 +48,25 @@ export default function LeaveReportPage() {
   const now = new Date()
   const upcomingLeaves = leaves.filter(l => new Date(l.start_date) >= now)
   const pastLeaves = leaves.filter(l => new Date(l.start_date) < now)
+
+  const [exportYear, setExportYear] = useState(String(new Date().getFullYear()))
+
+  const handleExportDefteri = async () => {
+    const { data: emps } = await supabase
+      .from('employees')
+      .select('*, leaves:leaves(*)')
+      .order('first_name')
+
+    if (emps) {
+      const filtered = emps.map((e: any) => ({
+        ...e,
+        leaves: (e.leaves || []).filter(
+          (l: any) => l.status === 'active' && l.leave_type === 'annual'
+        ),
+      }))
+      exportIzinDefteri(filtered, Number(exportYear))
+    }
+  }
 
   const filteredLeaves = (tab: string) => {
     let items: (Leave & { employee?: Employee })[]
@@ -166,12 +186,22 @@ export default function LeaveReportPage() {
           <h3 className="text-lg font-medium">İzin ve Rapor Raporu</h3>
           <p className="text-sm text-muted-foreground">Tüm izin ve rapor kayıtları</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportExcel}>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            value={exportYear}
+            onChange={e => setExportYear(e.target.value)}
+            className="h-9 w-16 rounded-lg border border-input bg-white px-2 text-sm text-center"
+          />
+          <Button variant="outline" size="sm" onClick={handleExportDefteri} title="İzin Defteri formatında indir">
+            <Download className="size-4" />
+            Defter
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportExcel}>
             <FileSpreadsheet className="size-4" />
             Excel
           </Button>
-          <Button variant="outline" onClick={handleExportPDF}>
+          <Button variant="outline" size="sm" onClick={handleExportPDF}>
             <FileText className="size-4" />
             PDF
           </Button>

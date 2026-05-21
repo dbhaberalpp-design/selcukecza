@@ -17,9 +17,17 @@ CREATE TABLE employees (
   email TEXT DEFAULT '',
   phone TEXT DEFAULT '',
   start_date DATE NOT NULL,
+  carryover_days INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add carryover_days if table already exists
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='carryover_days') THEN
+    ALTER TABLE employees ADD COLUMN carryover_days INTEGER DEFAULT 0;
+  END IF;
+END $$;
 
 -- Leaves table
 CREATE TABLE leaves (
