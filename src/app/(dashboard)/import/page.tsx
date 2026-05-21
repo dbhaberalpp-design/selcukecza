@@ -27,9 +27,10 @@ export default function ImportPage() {
       const firstRow = rows[0] || []
       const normalize = (s: string) =>
         s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/İ/g, 'I').replace(/ı/g, 'i').toUpperCase()
-      const allText = rows.map((r: any[]) => normalize(String(r[0] || ''))).join(' ')
+      const allText = rows.map((r: any[]) => r.map((c: any) => normalize(String(c || ''))).join(' ')).join(' ')
 
       setDebug(prev => [...prev, `Sayfa: ${wb.SheetNames[0]}, Satır: ${rows.length}, İlk hücre: "${String(firstRow[0] || '').trim()}"`])
+      setDebug(prev => [...prev, `İlk satır: "${rows[0].map((c: any) => String(c || '').trim()).join(' | ')}"`])
 
       if (allText.includes('SICIL') && allText.includes('HAK ETTIGI')) return 'defter'
       if (allText.includes('RAPORLU') || allText.includes('IZINLI')) return 'liste'
